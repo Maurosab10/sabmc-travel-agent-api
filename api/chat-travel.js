@@ -1,15 +1,23 @@
 import OpenAI from "openai";
 
-// El ASSISTANT_ID se lee desde las variables de entorno de Vercel
+// Leemos el Assistant ID desde variables de entorno
 const ASSISTANT_ID = process.env.ASSISTANT_ID;
 
 export default async function handler(req, res) {
-  // Solo aceptamos POST; cualquier otra cosa devuelve 405
+  // 🔹 CORS: permitir llamadas desde otros dominios (ej: sabmctravel.com)
+  res.setHeader("Access-Control-Allow-Origin", "*"); // si quieres, luego lo cambias a tu dominio
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // Responder a preflight (OPTIONS)
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  // Leemos la API key desde las variables de entorno
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -26,7 +34,6 @@ export default async function handler(req, res) {
       .json({ error: "Configuración del servidor incompleta: falta ASSISTANT_ID" });
   }
 
-  // Creamos el cliente SOLO cuando ya tenemos la API key
   const client = new OpenAI({ apiKey });
 
   try {
@@ -35,14 +42,14 @@ export default async function handler(req, res) {
     let thread;
 
     if (threadId) {
-      // Recuperamos el hilo existente y añadimos el nuevo mensaje del usuario
+      // Recuperar hilo existente y añadir nuevo mensaje de usuario
       thread = await client.beta.threads.retrieve(threadId);
       await client.beta.threads.messages.create(thread.id, {
         role: "user",
         content: messages[messages.length - 1].content,
       });
     } else {
-      // Creamos un hilo nuevo con el primer mensaje
+      // Crear hilo nuevo
       thread = await client.beta.threads.create({
         messages: messages.map((m) => ({
           role: m.role,
@@ -51,12 +58,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Ejecutamos el Assistant
+    // Ejecutar el Assistant
     await client.beta.threads.runs.createAndPoll(thread.id, {
       assistant_id: ASSISTANT_ID,
     });
 
-    // Leemos la última respuesta del Assistant
+    // Leer la última respuesta del Assistant
     const messagesResponse = await client.beta.threads.messages.list(thread.id);
     const lastMessage = messagesResponse.data[0];
     const answer = lastMessage.content[0]?.text?.value || "";
