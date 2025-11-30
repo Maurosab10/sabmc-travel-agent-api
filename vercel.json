@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/chat-travel.js": {
-      "runtime": "nodejs22.x"
-    }
-  }
-}
+
